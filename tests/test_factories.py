@@ -4,6 +4,7 @@ from wagtail import blocks
 from wagtail.models import Page, Site
 
 from tests.testapp.factories import MyTestPageFactory, MyTestPageGetOrCreateFactory
+import factory
 
 
 @pytest.mark.django_db()
@@ -173,46 +174,71 @@ def test_document_add_to_collection():
     assert document.collection.name == "new"
 
 @pytest.mark.django_db()
-def test_field_present_all_fields_present():
-    kwargs = {'field1': 'value1', 'field2': 'value2'}
-    # Simulate behavior where all fields are present
+def test_slug_and_parent_present():
+    # Create a root page as parent
+    root_page = wagtail_factories.PageFactory(parent=None)
+    
+    # Provide valid 'slug' and 'parent' in kwargs
+    kwargs = {'slug': 'unique-slug', 'parent': root_page}
+    
+    # Create a page instance
     instance = MyTestPageGetOrCreateFactory(**kwargs)
-    assert instance.field1 == 'value1'
-    assert instance.field2 == 'value2'
-
+    
+    # Assert that the created page has the expected values
+    assert instance.slug == 'unique-slug'
+    assert instance.get_parent() == root_page
 
 @pytest.mark.django_db()
-def test_field_absent_all_fields_present():
-    kwargs = {'field2': 'value2'}  # Missing field1
-    with pytest.raises(wagtail_factories.errors.FactoryError):
+def test_missing_parent():
+    # Provide only 'slug', missing the 'parent' argument
+    kwargs = {'slug': 'missing-parent'}
+    
+    # Expect a FactoryError due to missing 'parent' in kwargs
+    with pytest.raises(factory.errors.FactoryError):
         MyTestPageGetOrCreateFactory(**kwargs)
 
-
 @pytest.mark.django_db()
-def test_field_present_missing_fields():
-    kwargs = {'field1': 'value1'}  # Missing field2
-    with pytest.raises(wagtail_factories.errors.FactoryError):
+def test_fields_missing_in_kwargs():
+    # Create a root page as parent
+    root_page = wagtail_factories.PageFactory(parent=None)
+    
+    # Provide only 'slug', missing required fields
+    kwargs = {'slug': 'foobar'}
+    
+    # Expect a FactoryError due to missing fields defined in django_get_or_create
+    with pytest.raises(factory.errors.FactoryError):
         MyTestPageGetOrCreateFactory(**kwargs)
 
-
 @pytest.mark.django_db()
-def test_model_not_found_fields_ok():
-    kwargs = {'field1': 'value1', 'field2': 'value2'}
-    instance = MyTestPageGetOrCreateFactory(**kwargs)  # Model does not exist, should create
-    assert instance.field1 == 'value1'
-    assert instance.field2 == 'value2'
-
+def test_duplicate_slug_same_parent():
+    # Create a root page as parent
+    root_page = wagtail_factories.PageFactory(parent=None)
+    
+    # Create two pages with the same 'slug' and 'parent'
+    page_1 = MyTestPageGetOrCreateFactory(slug="test-slug", parent=root_page)
+    page_2 = MyTestPageGetOrCreateFactory(slug="test-slug", parent=root_page)
+    
+    # Assert that both pages are the same instance
+    assert page_1.pk == page_2.pk
 
 @pytest.mark.django_db()
 def test_model_not_found_insufficient_fields():
-    kwargs = {'field1': 'value1'}  # Missing fields, model does not exist
-    with pytest.raises(wagtail_factories.errors.FactoryError):
+    # Provide only 'slug', missing required fields
+    kwargs = {'slug': 'foobar'}
+    
+    # Expect a FactoryError due to insufficient fields to create a new instance
+    with pytest.raises(factory.errors.FactoryError):
         MyTestPageGetOrCreateFactory(**kwargs)
 
-
 @pytest.mark.django_db()
-def test_model_found():
-    kwargs = {'field1': 'value1', 'field2': 'value2'}
-    instance_1 = MyTestPageGetOrCreateFactory(**kwargs)
-    instance_2 = MyTestPageGetOrCreateFactory(**kwargs)  # Should return existing model
-    assert instance_1.pk == instance_2.pk  # Ensure the same instance is returned
+def test_different_parent_same_slug():
+    # Create two different root pages as parents
+    root_page_1 = wagtail_factories.PageFactory(parent=None, slug="parent-1")
+    root_page_2 = wagtail_factories.PageFactory(parent=None, slug="parent-2")
+    
+    # Create two pages with the same 'slug' but different parents
+    page_1 = MyTestPageGetOrCreateFactory(slug="test-slug", parent=root_page_1)
+    page_2 = MyTestPageGetOrCreateFactory(slug="test-slug", parent=root_page_2)
+    
+    # Assert that both pages are different instances
+    assert page_1.pk != page_2.pk
