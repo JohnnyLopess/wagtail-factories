@@ -171,3 +171,48 @@ def test_document_add_to_collection():
         collection__parent=root_collection, collection__name="new"
     )
     assert document.collection.name == "new"
+
+@pytest.mark.django_db()
+def test_field_present_all_fields_present():
+    kwargs = {'field1': 'value1', 'field2': 'value2'}
+    # Simulate behavior where all fields are present
+    instance = MyTestPageGetOrCreateFactory(**kwargs)
+    assert instance.field1 == 'value1'
+    assert instance.field2 == 'value2'
+
+
+@pytest.mark.django_db()
+def test_field_absent_all_fields_present():
+    kwargs = {'field2': 'value2'}  # Missing field1
+    with pytest.raises(wagtail_factories.errors.FactoryError):
+        MyTestPageGetOrCreateFactory(**kwargs)
+
+
+@pytest.mark.django_db()
+def test_field_present_missing_fields():
+    kwargs = {'field1': 'value1'}  # Missing field2
+    with pytest.raises(wagtail_factories.errors.FactoryError):
+        MyTestPageGetOrCreateFactory(**kwargs)
+
+
+@pytest.mark.django_db()
+def test_model_not_found_fields_ok():
+    kwargs = {'field1': 'value1', 'field2': 'value2'}
+    instance = MyTestPageGetOrCreateFactory(**kwargs)  # Model does not exist, should create
+    assert instance.field1 == 'value1'
+    assert instance.field2 == 'value2'
+
+
+@pytest.mark.django_db()
+def test_model_not_found_insufficient_fields():
+    kwargs = {'field1': 'value1'}  # Missing fields, model does not exist
+    with pytest.raises(wagtail_factories.errors.FactoryError):
+        MyTestPageGetOrCreateFactory(**kwargs)
+
+
+@pytest.mark.django_db()
+def test_model_found():
+    kwargs = {'field1': 'value1', 'field2': 'value2'}
+    instance_1 = MyTestPageGetOrCreateFactory(**kwargs)
+    instance_2 = MyTestPageGetOrCreateFactory(**kwargs)  # Should return existing model
+    assert instance_1.pk == instance_2.pk  # Ensure the same instance is returned
